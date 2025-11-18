@@ -11,11 +11,11 @@ import numpy as np
 """
 
 # 连接的安卓设备的IP地址
-IP_ADDR = "10.0.0.6"
+IP_ADDR = "10.201.162.60"
 
 # 无人机传回的图像可能很大，
 #  使用这个来缩小图像：
-SCALE_FACTOR = 0.25
+SCALE_FACTOR = 0.5
 
 # 创建空白帧
 BLANK_FRAME = np.zeros((1080, 1920, 3))

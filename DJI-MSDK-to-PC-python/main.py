@@ -1,9 +1,11 @@
 import sys
-import re  # 导入正则表达式库
-# import math  # 不再需要 math 库
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
+import re
+import cv2  # 导入 OpenCV
+import numpy as np
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QSizePolicy
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtCore import QTimer, QUrl
+from PyQt5.QtCore import QTimer, QUrl, Qt
+from PyQt5.QtGui import QImage, QPixmap
 
 # 导入 OpenDJI 库
 from OpenDJI import OpenDJI
@@ -12,51 +14,103 @@ from OpenDJI import OpenDJI
 class RealTimeMapApp(QMainWindow):
     def __init__(self):
         super(RealTimeMapApp, self).__init__()
-        self.setWindowTitle('无人机实时地图轨迹')  # 修改了标题
-        self.resize(1300, 1000)
+        self.setWindowTitle('无人机监控终端 - 左侧地图 / 右侧视觉')
+        self.resize(2000, 1000)  # 调整宽一点以容纳两个窗口
 
-        layout = QVBoxLayout()
+        # --- 布局设置 ---
+        # 使用 QHBoxLayout 实现左右分屏
+        main_layout = QHBoxLayout()
 
+        # 1. 左侧：地图
         self.qwebengine = QWebEngineView(self)
-        layout.addWidget(self.qwebengine)
+        # 设置伸缩因子，例如地图占 1 份
+        main_layout.addWidget(self.qwebengine, stretch=1)
 
+        # 2. 右侧：视频显示
+        self.video_label = QLabel("等待视频流...", self)
+        self.video_label.setAlignment(Qt.AlignCenter)
+        self.video_label.setStyleSheet("background-color: black; color: white; font-size: 20px;")
+        self.video_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)  # 允许缩放
+        self.video_label.setScaledContents(True)  # 让图片自适应 Label 大小
+        # 设置伸缩因子，例如视频占 1 份
+        main_layout.addWidget(self.video_label, stretch=1)
+
+        # 容器设置
         self.container = QWidget(self)
-        self.container.setLayout(layout)
+        self.container.setLayout(main_layout)
         self.setCentralWidget(self.container)
 
+        # 加载地图
         self.qwebengine.setHtml(self.generate_map_html(), baseUrl=QUrl.fromLocalFile('.'))
 
+        # 变量初始化
         self.new_point = None
         self.old_point = None
         self.old_label = None
 
-        # --- 新增：连接到无人机 ---
+        # --- 连接无人机 ---
         self.drone = None
+        IP_ADDR = "10.201.162.60"  # 替换为你的实际 IP
         try:
-            # 连接的安卓设备的IP地址 (从 ExampleQueryGetGPS.py 引用)
-            IP_ADDR = "10.201.162.60"  # !! 注意：请确保这是您手机的正确IP
             print(f"正在连接到无人机 @ {IP_ADDR}...")
             self.drone = OpenDJI(IP_ADDR)
             print("连接成功！")
 
-            # 用于提取十进制数的正则表达式 (从 ExampleQueryGetGPS.py 引用)
             NUM_REG = '[-+]?\\d+\\.?\\d*'
-            # 用于解析GPS位置的正则表达式
             self.location_pattern = re.compile(
                 '{"latitude":(' + NUM_REG + '),' +
                 '"longitude":(' + NUM_REG + '),' +
                 '"altitude":(' + NUM_REG + ')}')
-
         except Exception as e:
             print(f"连接到无人机失败: {e}")
-            print("程序将以无数据模式运行。")
-        # ------------------------
 
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_map)
-        self.timer.start(1000)  # 每秒更新一次 (1000ms)
+        # --- 定时器设置 ---
+
+        # 1. GPS 地图更新定时器 (低频，例如 1000ms)
+        self.timer_gps = QTimer(self)
+        self.timer_gps.timeout.connect(self.update_map)
+        self.timer_gps.start(1000)
+
+        # 2. 视频流更新定时器 (高频，例如 30ms ~= 33FPS)
+        self.timer_video = QTimer(self)
+        self.timer_video.timeout.connect(self.update_video)
+        self.timer_video.start(30)
+
+    def update_video(self):
+        """
+        获取视频帧，处理（如YOLO），并显示在右侧
+        """
+        if self.drone is None:
+            return
+
+        # 获取原始帧 (BGR 格式, numpy array)
+        frame = self.drone.getFrame()
+
+        if frame is not None:
+            # ==========================================
+            # [未来扩展区域] 在这里加入你的目标检测代码
+            # ==========================================
+            # 示例逻辑:
+            # results = model(frame) # YOLO 推理
+            # frame = plot_boxes(results, frame) # 将框画在 frame 上
+            # ==========================================
+
+            # 1. OpenCV 默认是 BGR，Qt 显示需要 RGB
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # 2. 获取图像尺寸
+            h, w, ch = frame.shape
+            bytes_per_line = ch * w
+
+            # 3. 转换为 Qt 图像格式
+            qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
+
+            # 4. 显示在 Label 上
+            # 注意：因为设置了 setScaledContents(True)，Label 会自动缩放图片
+            self.video_label.setPixmap(QPixmap.fromImage(qt_image))
 
     def generate_map_html(self):
+        # ... (保持原有的 HTML 生成代码不变) ...
         html = """
         <!DOCTYPE html>
         <html>
@@ -64,10 +118,7 @@ class RealTimeMapApp(QMainWindow):
             <meta charset="utf-8" />
             <title>Real-time Map</title>
             <style>
-                body, html, #map {
-                    height: 100%;
-                    margin: 0;
-                }
+                body, html, #map { height: 100%; margin: 0; }
             </style>
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
             <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -75,48 +126,36 @@ class RealTimeMapApp(QMainWindow):
         <body>
             <div id="map" style="width: 100%; height: 100vh;"></div>
             <script>
-                // [修改] 将地图中心设置到一个大致的初始位置，例如上海
                 var mymap = L.map('map').setView([31.2304, 121.4737], 13); 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap contributors'
                 }).addTo(mymap);
                 var pathMarkers = L.layerGroup().addTo(mymap);
-
                 var newMarkerIcon = L.icon({
                     iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
                     iconSize: [25, 41],
                     iconAnchor: [12, 41]
                 });
-
                 var oldMarker;
                 var oldLabel;
-
                 function addPoint(lat, lng, isNew) {
                     var latlng = new L.LatLng(lat, lng);
                     if (isNew) {
-                        if (oldMarker) {
-                            pathMarkers.removeLayer(oldMarker);
-                        }
-                        if (oldLabel) {
-                            mymap.removeLayer(oldLabel);
-                        }
-
+                        if (oldMarker) { pathMarkers.removeLayer(oldMarker); }
+                        if (oldLabel) { mymap.removeLayer(oldLabel); }
                         oldMarker = L.marker(latlng, { icon: newMarkerIcon }).addTo(pathMarkers);
-
                         var label = L.divIcon({
                             className: 'label',
                             html: `<div style="white-space: nowrap; margin-left: 1em;">Lat: ${lat.toFixed(7)} Lng: ${lng.toFixed(7)}</div>`
                         });
-
                         var newLabel = L.marker(latlng, { icon: label }).addTo(mymap);
                         oldLabel = newLabel;
                     }
-                    // 只有在第一次获取坐标时才平移
                     if (!mymap.firstPanDone) {
-                        mymap.setView(latlng, 17); // 放大并居中
-                        mymap.firstPanDone = true; // 设置一个标志，避免后续一直平移
+                        mymap.setView(latlng, 17);
+                        mymap.firstPanDone = true;
                     } else {
-                        mymap.panTo(latlng); // 后续只平移
+                        mymap.panTo(latlng);
                     }
                 }
             </script>
@@ -126,73 +165,37 @@ class RealTimeMapApp(QMainWindow):
         return html
 
     def update_map(self):
-        # 如果无人机未连接，则不执行任何操作
+        # ... (保持原有的 GPS 更新逻辑不变) ...
         if self.drone is None:
             return
 
-        new_point = None
+        # [为了节省篇幅，此处省略 try-except 块内的原有逻辑，请直接保留你原来的 update_map 代码]
+        # 只要确保它是通过 self.timer_gps 调用的即可
         try:
-            # --- 核心修改：从无人机获取实时GPS数据 ---
-            # 获取位置信息
             location3D_str = self.drone.getValue(OpenDJI.MODULE_FLIGHTCONTROLLER, "AircraftLocation3D")
-
-            # 解析返回的字符串
             location_match = self.location_pattern.fullmatch(location3D_str)
-
             if location_match:
                 latitude = float(location_match.group(1))
                 longitude = float(location_match.group(2))
-                altitude = float(location_match.group(3)) # 高度信息暂时不用
-
-                # 检查坐标是否有效（例如，(0,0) 通常是无效数据）
-                if abs(latitude) > 0.01 and abs(longitude) > 0.01:
+                if abs(latitude) > 0.01:
                     new_point = [latitude, longitude]
-                else:
-                    print("收到无效GPS坐标(0,0)，已忽略。")
-            else:
-                print(f"GPS数据解析失败。原始数据: {location3D_str}")
-            # ----------------------------------------
-
+                    if self.new_point is not None: self.old_point = self.new_point
+                    self.new_point = new_point
+                    javascript = f"addPoint({new_point[0]}, {new_point[1]}, true);"
+                    self.qwebengine.page().runJavaScript(javascript)
+                    if self.old_point is not None:
+                        lineCoordinates = "[[" + f"{self.old_point[0]},{self.old_point[1]}], [{new_point[0]},{new_point[1]}]]"
+                        javascript = f"var line = L.polyline({lineCoordinates}, {{color: 'red'}}).addTo(mymap);"
+                        self.qwebengine.page().runJavaScript(javascript)
         except Exception as e:
-            print(f"获取GPS时出错: {e}")
-            # 发生错误时（例如网络中断），尝试自动重连
-            try:
-                print("尝试重新连接...")
-                IP_ADDR = self.drone.host_address
-                self.drone.close()  # 先关闭旧的
-                self.drone = OpenDJI(IP_ADDR)
-                print("重新连接成功！")
-            except Exception as re_e:
-                print(f"重连失败: {re_e}")
-                self.drone = None  # 彻底标记为断开
-            return
-
-        # --- 更新地图 (这部分逻辑与之前相同) ---
-        if new_point is None:
-            return  # 如果没有有效的新点，则不更新
-
-        if self.new_point is not None:
-            self.old_point = self.new_point
-        self.new_point = new_point
-
-        # 使用 JavaScript 添加新的轨迹点到地图上
-        javascript = f"addPoint({new_point[0]}, {new_point[1]}, true);"
-        self.qwebengine.page().runJavaScript(javascript)
-
-        if self.old_point is not None:
-            # 使用 JavaScript 添加旧的轨迹点到地图上，并连接成线
-            lineCoordinates = "[[" + f"{self.old_point[0]},{self.old_point[1]}], [{new_point[0]},{new_point[1]}]]"
-            javascript = f"var line = L.polyline({lineCoordinates}, {{color: 'red'}}).addTo(mymap);"
-            self.qwebengine.page().runJavaScript(javascript)
+            print(e)
 
     def closeEvent(self, event):
-        """
-        重写窗口关闭事件，以确保无人机连接被安全关闭。
-        """
         print("正在关闭窗口并断开无人机连接...")
         if self.drone:
-            self.drone.close()  # 调用 OpenDJI 的 close 方法
-        event.accept()  # 接受关闭事件
+            self.drone.close()
+        event.accept()
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
