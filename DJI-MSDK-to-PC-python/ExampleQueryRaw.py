@@ -3,15 +3,13 @@ import threading
 import time
 
 """
-This example show how to talk with the MSDK over sockets.
-The help information (command '?') will explain how to use this
-more sophisticatedly.
+这个示例展示了如何通过套接字（sockets）与 MSDK 通信。
+帮助信息（'?' 指令）将解释如何更复杂地使用它。
 """
 
-# IP and port address
+# IP 和端口地址
 HOST = '10.0.0.6'
 PORT_VIDEO = 9997
-
 
 info = """
       <<< COMMANDS >>>
@@ -31,9 +29,9 @@ info = """
 
     Type 'quit' or 'exit' to close the program.
 
-    
+
       <<< EXAMPLES >>>
-  
+
 > help
 {"Gimbal","RemoteController","FlightController","Battery","AirLink","Product",
 "Camera"}
@@ -64,9 +62,9 @@ FlightController LEDsSettings success
 
 def read_message(sock):
     """
-    Read the message (and print them) in the background.
+    在后台读取消息（并打印它们）。
     """
-    
+
     while True:
         try:
             data = sCommand.recv(1000000, )
@@ -85,23 +83,21 @@ print()
 print("  Type '?' to show helping message.")
 print()
 
-
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sCommand:
-    
-    # Connect to the drone
+    # 连接到无人机
     sCommand.connect((HOST, PORT_VIDEO))
 
-    # Retrive the output in the background - mainly for 'listen' commands.
-    thread = threading.Thread(target = read_message, args = (sCommand,))
+    # 在后台检索输出 - 主要用于 'listen' (监听) 指令。
+    thread = threading.Thread(target=read_message, args=(sCommand,))
     thread.daemon = True
     thread.start()
 
     while True:
-        
-        # Get command
+
+        # 获取指令
         command = input("> ")
 
-        # Special commands
+        # 特殊指令
         if command == "": continue
         if command.isspace(): continue
         if command == "quit": break
@@ -110,13 +106,12 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sCommand:
         if command == "?":
             print(info)
             continue
-        
-        # not special command - send it to the drone.
+
+        # 非特殊指令 - 将其发送给无人机。
         sCommand.sendall(bytes(command + '\r\n', 'utf-8'))
-        # Give a moment to read the output
+        # 稍等片刻以读取输出
         time.sleep(0.5)
 
     sCommand.close()
 
 print('bye!')
-

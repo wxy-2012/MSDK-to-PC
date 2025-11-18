@@ -5,52 +5,50 @@ import cv2
 import numpy as np
 
 """
-In this example you will see how the retrieve the drone images asynchronously,
-using a listener, with the OpenDJI class.
+在这个示例中，你将看到如何使用 OpenDJI 类，
+通过监听器异步检索无人机图像。
 
-    press Q - to close the problam
+    按 Q - 关闭程序
 """
 
-# IP address of the connected android device
+# 连接的安卓设备的IP地址
 IP_ADDR = "10.0.0.6"
 
-# The image from the drone can be quit big,
-#  use this to scale down the image:
+# 无人机传回的图像可能很大，
+#  使用这个来缩小图像：
 SCALE_FACTOR = 0.25
 
-# Initiate frame as blank frame
+# 初始化帧为空白帧
 frame = np.zeros((1080, 1920, 3))
 frame = cv2.putText(frame, "No Image", (200, 300),
                     cv2.FONT_HERSHEY_PLAIN, 10,
                     (255, 255, 255), 10)
-frame = cv2.resize(frame, dsize = None,
-                   fx = SCALE_FACTOR, fy = SCALE_FACTOR)
+frame = cv2.resize(frame, dsize=None,
+                   fx=SCALE_FACTOR, fy=SCALE_FACTOR)
 
 
-# Create background listener
+# 创建后台监听器
 class frameListener(EventListener):
 
     def onValue(self, _frame):
-        """ Called when new frame available """
+        """ 当有新帧可用时调用 """
         global frame
-        frame = cv2.resize(_frame, dsize = None,
-                           fx = SCALE_FACTOR, fy = SCALE_FACTOR)
+        frame = cv2.resize(_frame, dsize=None,
+                           fx=SCALE_FACTOR, fy=SCALE_FACTOR)
 
     def onError(self, ):
-        # TODO : change parameters of onError
+        # TODO : 更改 onError 的参数
         pass
 
 
-# Connect to the drone
+# 连接到无人机
 with OpenDJI(IP_ADDR) as drone:
-    
-    # Register the frame background listener
+    # 注册帧后台监听器
     drone.frameListener(frameListener())
-    # After doing so, the frame will be updated in the background
+    # 这样做之后，帧将在后台更新
 
-    # Press 'q' to close the program
+    # 按 'q' 关闭程序
     print("Press 'q' to close the program")
     while cv2.waitKey(20) != ord('q'):
-
-        # Show frame
+        # 显示帧
         cv2.imshow("Live video", frame)

@@ -4,44 +4,42 @@ import cv2
 import numpy as np
 
 """
-In this example you will see how the retrieve the drone images synchronously,
-within the main function, with the OpenDJI class.
+在这个示例中，你将看到如何使用 OpenDJI 类，
+在主函数中同步检索无人机图像。
 
-    press Q - to close the problam
+    按 Q - 关闭程序
 """
 
-# IP address of the connected android device
+# 连接的安卓设备的IP地址
 IP_ADDR = "10.0.0.6"
 
-# The image from the drone can be quit big,
-#  use this to scale down the image:
+# 无人机传回的图像可能很大，
+#  使用这个来缩小图像：
 SCALE_FACTOR = 0.25
 
-# Create blank frame
+# 创建空白帧
 BLANK_FRAME = np.zeros((1080, 1920, 3))
 BLNAK_FRAME = cv2.putText(BLANK_FRAME, "No Image", (200, 300),
                           cv2.FONT_HERSHEY_PLAIN, 10,
                           (255, 255, 255), 10)
 
-
-# Connect to the drone
+# 连接到无人机
 with OpenDJI(IP_ADDR) as drone:
-    
-    # Press 'q' to close the program
+    # 按 'q' 关闭程序
     print("Press 'q' to close the program")
     while cv2.waitKey(20) != ord('q'):
 
-        # Get frame
+        # 获取帧
         frame = drone.getFrame()
 
-        # What to do when no frame available
+        # 当没有可用帧时要执行的操作
         if frame is None:
             frame = BLANK_FRAME
-    
-        # Resize frame - optional
-        frame = cv2.resize(frame, dsize = None,
-                           fx = SCALE_FACTOR,
-                           fy = SCALE_FACTOR)
-        
-        # Show frame
+
+        # 调整帧大小 - 可选
+        frame = cv2.resize(frame, dsize=None,
+                           fx=SCALE_FACTOR,
+                           fy=SCALE_FACTOR)
+
+        # 显示帧
         cv2.imshow("Live video", frame)

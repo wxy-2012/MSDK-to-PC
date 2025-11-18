@@ -1,29 +1,26 @@
 from OpenDJI import OpenDJI
 
 """
-In this example you will see how to use the 'help' functions.
-The help function help the user to find and understand the available
-commands that the MSDK offer.
+在这个示例中，你将看到如何使用 'help' (帮助) 功能。
+帮助功能可以帮助用户查找并理解 MSDK 提供的可用指令。
 """
 
-# IP address of the connected android device
+# 连接的安卓设备的IP地址
 IP_ADDR = "10.0.0.6"
 
-
-# Connect to the drone
+# 连接到无人机
 with OpenDJI(IP_ADDR) as drone:
-    
-    # Get list of available modules
+    # 获取可用模块列表
     list_modules = drone.getModules()[1:-1].replace('"', '').split(",")
     print("Modules :", list_modules)
     print()
 
-    # Get list of available keys inside a module
+    # 获取模块内的可用键 (key) 列表
     list_keys = drone.getModuleKeys(OpenDJI.MODULE_BATTERY)[1:-1].replace('"', '').split(",")
     print("Module Keys :", sorted(list_keys))
     print()
 
-    # Get information on specific key
+    # 获取特定键 (key) 的信息
     key_info = drone.getKeyInfo(OpenDJI.MODULE_FLIGHTCONTROLLER, "AircraftLocation3D")
     print("Key Info :")
     print(key_info)

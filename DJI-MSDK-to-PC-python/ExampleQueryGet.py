@@ -3,37 +3,34 @@ from OpenDJI import OpenDJI
 import re
 
 """
-In this example you will have simple demo on how to get information fron the drone.
-This will show how the message is received and should parsed, in this example the 
-battery information from the remote controller is used.
+在这个示例中，你将看到一个如何从无人机获取信息的简单演示。
+这将展示消息是如何被接收和应当如何解析的，在这个示例中，
+使用的是遥控器的电池信息。
 """
 
-# IP address of the connected android device
+# 连接的安卓设备的IP地址
 IP_ADDR = "10.0.0.6"
 
-
-# Connect to the drone
+# 连接到无人机
 with OpenDJI(IP_ADDR) as drone:
-    
-    # Get the battery info
+    # 获取电池信息
     battery_text = drone.getValue(OpenDJI.MODULE_REMOTECONTROLLER, "BatteryInfo")
-    print("Original result :", battery_text)
+    print("原始结果 :", battery_text)
 
-    # you need to manually check for errors, and pharse the returned string
+    # 你需要手动检查错误，并解析返回的字符串
     battery_pattern = re.compile(
         '{"enabled":(.+),"batteryPower":(\\d+),"batteryPercent":(\\d+)}')
 
-    # If the result match the regex, parse it.
-    battery_match : re.Match = battery_pattern.fullmatch(battery_text)
+    # 如果结果匹配正则表达式，则解析它。
+    battery_match: re.Match = battery_pattern.fullmatch(battery_text)
     if battery_match is not None:
+        # 第一个值是是否启用
+        print("是否启用 :", battery_match.group(1))
 
-        # first value if enabled
-        print("Enabled :", battery_match.group(1))
+        # 第二个值是电量 (mah)
+        print("电量 :", battery_match.group(2), "mah")
 
-        # Second value for the pawer
-        print("Power :", battery_match.group(2), "mah")
-
-        # Third value is the percentage
-        print("Percent :", battery_match.group(3), "%")
+        # 第三个值是百分比
+        print("百分比 :", battery_match.group(3), "%")
 
     print()

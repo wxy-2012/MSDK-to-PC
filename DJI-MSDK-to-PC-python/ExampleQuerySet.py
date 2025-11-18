@@ -3,44 +3,42 @@ from OpenDJI import OpenDJI
 import time
 
 """
-In this example you will see how to use the set function.
-The set function need a specific text, which is different for each key,
-and should be obtained with the help of the 'help' function (e.g. keyInfo).
-In this example we will set the leds behavior to be turned off for 10 seconds,
-and then return them to the original state.
+在这个示例中，你将看到如何使用 set (设置) 功能。
+set 功能需要特定的文本，每个键 (key) 都不同，
+应该在 'help' (帮助) 功能（例如 keyInfo）的帮助下获取。
+在这个示例中，我们将设置 LED 的行为为关闭 10 秒钟，
+然后将它们恢复到原始状态。
 """
 
-# IP address of the connected android device
+# 连接的安卓设备的IP地址
 IP_ADDR = "10.0.0.6"
 
-
-# Connect to the drone
+# 连接到无人机
 with OpenDJI(IP_ADDR) as drone:
-    
-    # Get the LEDs information
+    # 获取 LED 信息
     LEDs_settings_original = drone.getValue("FlightController", "LEDsSettings")
     print("Original result :", LEDs_settings_original)
 
-    # The command to set the LEDs,
-    # How I know the command protocol ? I used this command:
+    # 设置 LED 的指令，
+    # 我如何知道指令协议？我使用了这个指令：
     #   print(drone.getKeyInfo("FlightController", "LEDsSettings"))
     LEDs_settings = \
-    ('{'
-        '"frontLEDsOn":false,'
-        '"statusIndicatorLEDsOn":false,'
-        '"rearLEDsOn":false,'
-        '"navigationLEDsOn":false'
-    '}')
+        ('{'
+         '"frontLEDsOn":false,'
+         '"statusIndicatorLEDsOn":false,'
+         '"rearLEDsOn":false,'
+         '"navigationLEDsOn":false'
+         '}')
 
-    # Try to set the LEDs
+    # 尝试设置 LED
     print(drone.setValue("FlightController", "LEDsSettings", LEDs_settings))
 
-    # Get the LEDs information once again
+    # 再次获取 LED 信息
     LEDs_settings_modified = drone.getValue("FlightController", "LEDsSettings")
     print("Modified result :", LEDs_settings_modified)
 
     time.sleep(10.0)
 
-    # Finally, to not hurt any body, set back the original setting
+    # 最后，为了不伤害任何人（比喻），将原始设置改回去
     print(drone.setValue("FlightController", "LEDsSettings", LEDs_settings_original))
     print()
