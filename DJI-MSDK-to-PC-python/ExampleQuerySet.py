@@ -11,7 +11,7 @@ set 功能需要特定的文本，每个键 (key) 都不同，
 """
 
 # 连接的安卓设备的IP地址
-IP_ADDR = "10.0.0.6"
+IP_ADDR = "10.201.162.60"
 
 # 连接到无人机
 with OpenDJI(IP_ADDR) as drone:
