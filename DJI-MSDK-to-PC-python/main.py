@@ -2,7 +2,9 @@ import sys
 import re
 import cv2  # 导入 OpenCV
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QSizePolicy
+# [修改 1] 导入 QPushButton 以创建按钮
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QSizePolicy, \
+    QPushButton
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QTimer, QUrl, Qt
 from PyQt5.QtGui import QImage, QPixmap
@@ -14,30 +16,59 @@ from OpenDJI import OpenDJI
 class RealTimeMapApp(QMainWindow):
     def __init__(self):
         super(RealTimeMapApp, self).__init__()
-        self.setWindowTitle('无人机监控终端 - 左侧地图 / 右侧视觉')
-        self.resize(2000, 1000)  # 调整宽一点以容纳两个窗口
+        self.setWindowTitle('无人机监控终端 - 地图 / 视觉 / 控制')
+        self.resize(2000, 1100)  # 稍微调高一点高度以容纳底部按钮
 
         # --- 布局设置 ---
-        # 使用 QHBoxLayout 实现左右分屏
-        main_layout = QHBoxLayout()
+
+        # [修改 2] 创建根布局 (垂直)，用于上下排列 "内容区" 和 "控制区"
+        root_layout = QVBoxLayout()
+
+        # [修改 3] 内容布局 (水平)，用于左右排列 "地图" 和 "视频" (原有的 main_layout)
+        content_layout = QHBoxLayout()
 
         # 1. 左侧：地图
         self.qwebengine = QWebEngineView(self)
-        # 设置伸缩因子，例如地图占 1 份
-        main_layout.addWidget(self.qwebengine, stretch=1)
+        content_layout.addWidget(self.qwebengine, stretch=1)
 
         # 2. 右侧：视频显示
         self.video_label = QLabel("等待视频流...", self)
         self.video_label.setAlignment(Qt.AlignCenter)
         self.video_label.setStyleSheet("background-color: black; color: white; font-size: 20px;")
-        self.video_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)  # 允许缩放
-        self.video_label.setScaledContents(True)  # 让图片自适应 Label 大小
-        # 设置伸缩因子，例如视频占 1 份
-        main_layout.addWidget(self.video_label, stretch=1)
+        self.video_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.video_label.setScaledContents(True)
+        content_layout.addWidget(self.video_label, stretch=1)
+
+        # 将内容布局加入根布局
+        root_layout.addLayout(content_layout, stretch=10)  # 内容区占大部分空间
+
+        # [修改 4] 创建底部控制栏布局
+        control_layout = QHBoxLayout()
+
+        # --- 创建控制按钮 ---
+        self.btn_takeoff = QPushButton("一键起飞 (Takeoff)")
+        self.btn_land = QPushButton("一键降落 (Land)")
+
+        # 设置按钮样式 (起飞绿色，降落红色，字体加大)
+        self.btn_takeoff.setStyleSheet(
+            "background-color: #28a745; color: white; font-size: 18px; padding: 10px; font-weight: bold; border-radius: 5px;")
+        self.btn_land.setStyleSheet(
+            "background-color: #dc3545; color: white; font-size: 18px; padding: 10px; font-weight: bold; border-radius: 5px;")
+
+        # 连接按钮点击事件到函数
+        self.btn_takeoff.clicked.connect(self.action_takeoff)
+        self.btn_land.clicked.connect(self.action_land)
+
+        # 将按钮加入控制栏
+        control_layout.addWidget(self.btn_takeoff)
+        control_layout.addWidget(self.btn_land)
+
+        # 将控制栏加入根布局
+        root_layout.addLayout(control_layout, stretch=1)  # 按钮区占小部分空间
 
         # 容器设置
         self.container = QWidget(self)
-        self.container.setLayout(main_layout)
+        self.container.setLayout(root_layout)  # 设置为新的根布局
         self.setCentralWidget(self.container)
 
         # 加载地图
@@ -50,7 +81,7 @@ class RealTimeMapApp(QMainWindow):
 
         # --- 连接无人机 ---
         self.drone = None
-        IP_ADDR = "10.201.162.60"  # 替换为你的实际 IP
+        IP_ADDR = "10.104.16.60"  # 替换为你的实际 IP
         try:
             print(f"正在连接到无人机 @ {IP_ADDR}...")
             self.drone = OpenDJI(IP_ADDR)
@@ -65,48 +96,55 @@ class RealTimeMapApp(QMainWindow):
             print(f"连接到无人机失败: {e}")
 
         # --- 定时器设置 ---
-
-        # 1. GPS 地图更新定时器 (低频，例如 1000ms)
         self.timer_gps = QTimer(self)
         self.timer_gps.timeout.connect(self.update_map)
         self.timer_gps.start(1000)
 
-        # 2. 视频流更新定时器 (高频，例如 30ms ~= 33FPS)
         self.timer_video = QTimer(self)
         self.timer_video.timeout.connect(self.update_video)
         self.timer_video.start(30)
 
+    # [修改 5] 添加起飞和降落的逻辑函数
+    def action_takeoff(self):
+        """执行一键起飞"""
+        if self.drone:
+            print(">>> 发送起飞指令...")
+            # 参考 ExampleControl.py，参数 True 可能表示打印调试信息或确认
+            try:
+                result = self.drone.takeoff(True)
+                print(f"起飞指令返回: {result}")
+            except Exception as e:
+                print(f"起飞指令发送失败: {e}")
+        else:
+            print("错误: 无人机未连接")
+
+    def action_land(self):
+        """执行一键降落"""
+        if self.drone:
+            print(">>> 发送降落指令...")
+            try:
+                result = self.drone.land(True)
+                print(f"降落指令返回: {result}")
+            except Exception as e:
+                print(f"降落指令发送失败: {e}")
+        else:
+            print("错误: 无人机未连接")
+
     def update_video(self):
-        """
-        获取视频帧，处理（如YOLO），并显示在右侧
-        """
+        """获取视频帧，处理并显示"""
         if self.drone is None:
             return
 
-        # 获取原始帧 (BGR 格式, numpy array)
         frame = self.drone.getFrame()
 
         if frame is not None:
-            # ==========================================
-            # [未来扩展区域] 在这里加入你的目标检测代码
-            # ==========================================
-            # 示例逻辑:
-            # results = model(frame) # YOLO 推理
-            # frame = plot_boxes(results, frame) # 将框画在 frame 上
-            # ==========================================
-
-            # 1. OpenCV 默认是 BGR，Qt 显示需要 RGB
+            # OpenCV 默认是 BGR，Qt 显示需要 RGB
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            # 2. 获取图像尺寸
             h, w, ch = frame.shape
             bytes_per_line = ch * w
 
-            # 3. 转换为 Qt 图像格式
             qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
-
-            # 4. 显示在 Label 上
-            # 注意：因为设置了 setScaledContents(True)，Label 会自动缩放图片
             self.video_label.setPixmap(QPixmap.fromImage(qt_image))
 
     def generate_map_html(self):
@@ -165,12 +203,9 @@ class RealTimeMapApp(QMainWindow):
         return html
 
     def update_map(self):
-        # ... (保持原有的 GPS 更新逻辑不变) ...
         if self.drone is None:
             return
 
-        # [为了节省篇幅，此处省略 try-except 块内的原有逻辑，请直接保留你原来的 update_map 代码]
-        # 只要确保它是通过 self.timer_gps 调用的即可
         try:
             location3D_str = self.drone.getValue(OpenDJI.MODULE_FLIGHTCONTROLLER, "AircraftLocation3D")
             location_match = self.location_pattern.fullmatch(location3D_str)
@@ -188,7 +223,8 @@ class RealTimeMapApp(QMainWindow):
                         javascript = f"var line = L.polyline({lineCoordinates}, {{color: 'red'}}).addTo(mymap);"
                         self.qwebengine.page().runJavaScript(javascript)
         except Exception as e:
-            print(e)
+            # 可以在这里打印错误，或者忽略偶尔的解析错误
+            pass
 
     def closeEvent(self, event):
         print("正在关闭窗口并断开无人机连接...")
